@@ -23,6 +23,7 @@ export default function AddToHomeScreenPrompt() {
     const [isInstalled, setIsInstalled] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
     const [isIOS, setIsIOS] = useState(false);
+    const [isMacOS, setIsMacOS] = useState(false);
     const [browserType, setBrowserType] = useState<string>('');
     
     // Handle the native Chrome install prompt
@@ -74,6 +75,15 @@ export default function AddToHomeScreenPrompt() {
         setShowInstructions(true);
     };
 
+    // This function runs when we detect it's time to show manual instructions for macOS Safari
+    const showMacOSSafariInstructions = () => {
+        // Don't show if user has opted out
+        const addToHomeScreenPromptCookie = getCookie(COOKIE_NAME);
+        if (addToHomeScreenPromptCookie === 'dontShow') return;
+        
+        setShowInstructions(true);
+    };
+
     useEffect(() => {
         // Check if it's running in browser environment
         if (typeof window === 'undefined') return;
@@ -89,11 +99,13 @@ export default function AddToHomeScreenPrompt() {
         // Detect device and browser
         const ua = window.navigator.userAgent;
         const isIOSDevice = /iPhone|iPad|iPod/i.test(ua);
+        const isMacOSDevice = /Macintosh/.test(ua) && !/Windows/.test(ua) && !isIOSDevice;
         const isAndroid = /Android/i.test(ua);
         const isMobileDevice = isIOSDevice || isAndroid;
         
         setIsMobile(isMobileDevice);
         setIsIOS(isIOSDevice);
+        setIsMacOS(isMacOSDevice);
         
         // Detect browser type for specific instructions
         if (ua.includes('CriOS')) {
@@ -102,6 +114,9 @@ export default function AddToHomeScreenPrompt() {
             setBrowserType('firefox-ios');
         } else if (ua.includes('Safari') && isIOSDevice) {
             setBrowserType('safari-ios');
+        } else if (ua.includes('Safari') && isMacOSDevice && !ua.includes('Chrome')) {
+            // Safari on macOS (and not Chrome which also includes Safari in UA)
+            setBrowserType('safari-macos');
         } else if (ua.includes('Chrome') && isAndroid) {
             setBrowserType('chrome-android');
         } else if (ua.includes('Firefox') && isAndroid) {
@@ -120,11 +135,18 @@ export default function AddToHomeScreenPrompt() {
         if (addToHomeScreenPromptCookie === 'dontShow') return;
         
         // For iOS Safari, show instructions after a delay
-        // since beforeinstallprompt doesn't fire on iOS
         if (isIOSDevice && browserType === 'safari-ios') {
             setTimeout(() => {
                 showIOSInstructions();
             }, PROMPT_DELAY * 2); // Longer delay for iOS
+            return;
+        }
+        
+        // For macOS Safari, show different instructions after a delay
+        if (isMacOSDevice && browserType === 'safari-macos') {
+            setTimeout(() => {
+                showMacOSSafariInstructions();
+            }, PROMPT_DELAY * 2);
             return;
         }
         
@@ -164,12 +186,12 @@ export default function AddToHomeScreenPrompt() {
             window.removeEventListener('appinstalled', handleAppInstalled);
             if (promptTimer) clearTimeout(promptTimer);
         };
-    }, []);
+    }, [browserType]);
 
     // If app is already installed, don't show anything
     if (isInstalled) return null;
 
-    // Mobile install instructions based on browser/platform
+    // Installation instructions based on browser/platform
     const renderInstructions = () => {
         if (browserType === 'safari-ios') {
             return (
@@ -190,6 +212,29 @@ export default function AddToHomeScreenPrompt() {
                             <p>Add to Home Screen</p>
                         </div>
                     </div>
+                    <button className="border-2 p-1" onClick={doNotShowAgain}>Don&apos;t show again</button>
+                </div>
+            );
+        }
+        
+        if (browserType === 'safari-macos') {
+            return (
+                <div className="relative bg-blue-600 p-4 h-full rounded-xl flex flex-col justify-around items-center text-center">
+                    <button className="absolute top-0 right-0 p-3" onClick={closePrompt}>
+                        <X className="text-2xl" />
+                    </button>
+                    <p className="text-lg">For the best experience, install MatchMyPlan to your dock!</p>
+                    <div className="flex flex-col gap-2 items-center text-lg">
+                        <p>From the Safari menu, select:</p>
+                        <div className="bg-zinc-50 flex justify-center items-center w-full px-4 py-2 rounded-lg text-zinc-900">
+                            <p>File → Add to Dock...</p>
+                        </div>
+                    </div>
+                    <p className="text-md">Or use the keyboard shortcut:</p>
+                    <div className="bg-zinc-50 px-4 py-2 rounded-lg text-zinc-900">
+                        <p className="font-mono">⇧⌘D (Shift+Command+D)</p>
+                    </div>
+                    <p className="text-md">Then click 'Add' in the dialog that appears</p>
                     <button className="border-2 p-1" onClick={doNotShowAgain}>Don&apos;t show again</button>
                 </div>
             );
