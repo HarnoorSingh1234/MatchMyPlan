@@ -5,6 +5,7 @@ import "./globals.css";
 import Script from "next/script";
 import AddToHomeScreenPrompt from "@/components/pwa/AddToHomeScreenPrompt";
 import BottomNavigation from "@/components/mobile/BottomNavbar";
+import { ClerkProvider } from "@clerk/nextjs";
 
 const defaultUrl = process.env.VERCEL_URL
   ? `https://${process.env.VERCEL_URL}`
@@ -237,44 +238,47 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        {children}
-        <AddToHomeScreenPrompt />
-        <BottomNavigation />
-        {/* Service Worker Registration */}
-        <Script
-          id="register-sw"
-          strategy="afterInteractive"
-          dangerouslySetInnerHTML={{
-            __html: `
-              if ('serviceWorker' in navigator) {
-                window.addEventListener('load', async () => {
-                  try {
-                    const registration = await navigator.serviceWorker.register('/sw.js');
-                    console.log('ServiceWorker registration successful with scope:', registration.scope);
-                    
-                    // Set up periodic sync when supported (for future task scheduling)
-                    if ('periodicSync' in registration) {
-                      try {
-                        await registration.periodicSync.register('sync-tasks', {
-                          minInterval: 24 * 60 * 60 * 1000, // Once per day
-                        });
-                      } catch (error) {
-                        console.log('Periodic sync could not be registered:', error);
+    <ClerkProvider>
+            <html lang="en">
+        <body
+          className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        >
+          {children}
+          <AddToHomeScreenPrompt />
+          <BottomNavigation />
+          {/* Service Worker Registration */}
+          <Script
+            id="register-sw"
+            strategy="afterInteractive"
+            dangerouslySetInnerHTML={{
+              __html: `
+                if ('serviceWorker' in navigator) {
+                  window.addEventListener('load', async () => {
+                    try {
+                      const registration = await navigator.serviceWorker.register('/sw.js');
+                      console.log('ServiceWorker registration successful with scope:', registration.scope);
+                      
+                      // Set up periodic sync when supported (for future task scheduling)
+                      if ('periodicSync' in registration) {
+                        try {
+                          await registration.periodicSync.register('sync-tasks', {
+                            minInterval: 24 * 60 * 60 * 1000, // Once per day
+                          });
+                        } catch (error) {
+                          console.log('Periodic sync could not be registered:', error);
+                        }
                       }
+                    } catch (error) {
+                      console.error('ServiceWorker registration failed:', error);
                     }
-                  } catch (error) {
-                    console.error('ServiceWorker registration failed:', error);
-                  }
-                });
-              }
-            `,
-          }}
-        />
-      </body>
-    </html>
+                  });
+                }
+              `,
+            }}
+          />
+        </body>
+      </html>
+    </ClerkProvider>
+
   );
 }

@@ -90,19 +90,19 @@ This productivity PWA helps users manage tasks, deadlines, and related documents
 
 ## Project Timeline
 
-### Phase 1: PWA Setup & Core Task Management (Weeks 1-4)
+### Phase 1: PWA Setup & Core Task Management 
 - Project setup, UI foundation
 - Core task management functionality
 - Task organization with folders
 - Priority system implementation
 
-### Phase 2: Notification System & Reminders (Weeks 5-8)
+### Phase 2: Notification System & Reminders 
 - Browser notification setup
 - Priority-based notification system
 - Email integration
 - WhatsApp integration
 
-### Phase 3: Google Drive Integration (Weeks 9-12)
+### Phase 3: Google Drive Integration
 - Google authentication
 - Document listing and access
 - File attachment to tasks
@@ -126,3 +126,4 @@ npm install
 
 # Start development server
 npm run dev
+```

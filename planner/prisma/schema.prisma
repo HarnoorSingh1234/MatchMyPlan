@@ -1,0 +1,252 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User model designed to work with Clerk
+model User {
+  id              String    @id // Use Clerk's user ID as the primary ID
+  email           String    @unique // Email from Clerk
+  name            String?   // Name from Clerk
+  profilePicture  String?   // Profile image URL from Clerk
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  lastLogin       DateTime?
+  
+  // Google Drive integration data
+  googleDriveConnected Boolean @default(false)
+  googleDriveRefreshToken String? // For maintaining Google Drive access
+  
+  // User preferences
+  darkMode          Boolean   @default(false)
+  
+  // Integration webhooks
+  slackWebhookUrl   String?
+  discordWebhookUrl String?
+  
+  // Relationships
+  tasks             Task[]
+  folders           Folder[]
+  notifications     Notification[]
+  notificationChannels UserNotificationChannel[]
+  priorityLevels    PriorityLevel[]
+  integrations      UserIntegration[]
+}
+
+// External Service Integration model
+model UserIntegration {
+  id              String    @id @default(cuid())
+  service         String    // "slack", "discord", "telegram"
+  isEnabled       Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Integration-specific configuration (stored as JSON)
+  config          Json      // Contains webhookUrl, channelId, botToken, etc.
+  
+  // Integration authentication info (if needed)
+  accessToken     String?
+  refreshToken    String?
+  tokenExpiresAt  DateTime?
+  
+  // Relationships
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, service])
+  @@index([userId])
+  @@index([service])
+}
+
+// Task model for core task management
+model Task {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Task status and priority
+  completed   Boolean   @default(false)
+  priorityLevelId String? // Reference to user's custom priority level
+  priorityLevel PriorityLevel? @relation(fields: [priorityLevelId], references: [id], onDelete: SetNull)
+  
+  // Deadline tracking
+  dueDate     DateTime?
+  
+  // Relationships
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  folderId    String?
+  folder      Folder?   @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  documents   Document[]
+  notifications Notification[]
+  
+  @@index([userId])
+  @@index([folderId])
+  @@index([dueDate])
+  @@index([priorityLevelId])
+}
+
+// Custom Priority Levels model
+model PriorityLevel {
+  id              String    @id @default(cuid())
+  name            String    // e.g., "Critical", "High", "Medium", "Low", "Trivial"
+  level           Int       // Numerical value for ordering (1 = highest priority)
+  color           String    // Color code for visual distinction
+  description     String?   // Optional description
+  
+  // Relationships
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tasks           Task[]
+  channelSettings PriorityChannelSetting[]
+  
+  @@unique([userId, level]) // Ensure unique priority levels per user
+  @@index([userId])
+}
+
+// Notification Channel Types
+model NotificationChannel {
+  id              String    @id @default(cuid())
+  name            String    @unique // e.g., "browser", "email", "whatsapp", "sound", "slack", "discord", "telegram"
+  displayName     String    // User-friendly name
+  description     String?   // Description of the channel
+  iconUrl         String?   // Icon for the channel type
+  
+  // Relationships
+  userChannels    UserNotificationChannel[]
+  channelSettings PriorityChannelSetting[]
+}
+
+// User's enabled notification channels
+model UserNotificationChannel {
+  id                String    @id @default(cuid())
+  enabled           Boolean   @default(true)
+  
+  // For channel-specific configuration
+  contactValue      String?   // Email address, phone number, channel ID, etc.
+  
+  // Relationships
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channelId         String
+  channel           NotificationChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, channelId])
+  @@index([userId])
+}
+
+// Priority level to notification channel mapping
+model PriorityChannelSetting {
+  id              String    @id @default(cuid())
+  enabled         Boolean   @default(true)
+  
+  // Custom settings for this priority-channel combination
+  customMessage   String?  // Template for custom messages
+  leadTime        Int?     // Minutes before deadline to send notification
+  
+  // Relationships
+  priorityLevelId String
+  priorityLevel   PriorityLevel @relation(fields: [priorityLevelId], references: [id], onDelete: Cascade)
+  channelId       String
+  channel         NotificationChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  
+  @@unique([priorityLevelId, channelId])
+  @@index([priorityLevelId])
+  @@index([channelId])
+}
+
+// Folder model for organizing tasks
+model Folder {
+  id          String    @id @default(cuid())
+  name        String
+  color       String?   // Color code for visual distinction
+  icon        String?   // Icon identifier
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Relationships
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tasks       Task[]
+  
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+// Document model for Google Drive integration
+model Document {
+  id          String    @id @default(cuid())
+  fileName    String
+  fileType    String
+  fileSize    Int       // Size in bytes
+  driveFileId String    // Google Drive file ID
+  driveUrl    String    // Direct URL to the file
+  thumbnailUrl String?  // URL to file thumbnail
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Relationships
+  taskId      String
+  task        Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  
+  @@index([taskId])
+  @@index([fileType])
+}
+
+// Notification model for multi-channel alerts
+model Notification {
+  id              String    @id @default(cuid())
+  title           String
+  message         String
+  isRead          Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  scheduledFor    DateTime
+  
+  // Channel-specific records
+  channelDeliveries NotificationDelivery[]
+  
+  // Relationships
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taskId          String?
+  task            Task?     @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  
+  @@index([userId])
+  @@index([taskId])
+  @@index([scheduledFor])
+  @@index([isRead])
+}
+
+// Tracking notification delivery across channels
+model NotificationDelivery {
+  id              String    @id @default(cuid())
+  channelId       String
+  sent            Boolean   @default(false)
+  sentAt          DateTime?
+  deliveryStatus  String?   // "delivered", "failed", etc.
+  errorMessage    String?   // If delivery failed
+  
+  // For external service notifications
+  externalMessageId String? // ID of the message in Slack/Discord/Telegram
+  
+  // Relationships
+  notificationId  String
+  notification    Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  
+  @@unique([notificationId, channelId])
+  @@index([notificationId])
+  @@index([sent])
+}

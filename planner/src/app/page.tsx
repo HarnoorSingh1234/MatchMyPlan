@@ -1,6 +1,5 @@
-import Image from "next/image";
-import Link from "next/link";
-import { CalendarRange, CheckCheck, PlusCircle, Clock } from "lucide-react";
+
+import DecryptedText from "@/components/landing-page/DecryptedText";
 
 export default function Home() {
   return (
@@ -8,7 +7,12 @@ export default function Home() {
       {/* Header */}
       <header className="p-6 pt-8 text-center">
         <h1 className="text-3xl font-bold text-blue-600 dark:text-blue-400 mb-2">MatchMyPlan</h1>
-        <p className="text-gray-600 dark:text-gray-300 text-sm">Plan your day, achieve your goals</p>
+       <DecryptedText
+          text="Your Ultimate Planning Companion"
+          animateOn="view"
+          revealDirection="start"
+          speed={100}
+        />
       </header>
 
       {/* Main Content */}
